@@ -114,6 +114,11 @@ class Build(Command):
                             'being invoked directly (i.e. the `-Wl,\' prefix '
                             'should be omitted). Default: "%(default)s".')
 
+        parser.add_argument('--skip_lib_includes', default=False, action='store_true',
+                            help='Do not add Arduino libraries to the include path.'
+                            'Use this option and manually add include paths using'
+                            '--cxxflags if you encounter command line too long errors.')
+
         parser.add_argument('-v', '--verbose', default=False, action='store_true',
                             help='Verbose make output')
 
@@ -243,12 +248,15 @@ class Build(Command):
 
         return used_libs
 
-    def scan_dependencies(self):
+    def scan_dependencies(self, args):
         self.e['deps'] = SpaceList()
 
-        lib_dirs = [self.e.arduino_core_dir] + list_subdirs(self.e.lib_dir) + list_subdirs(self.e.arduino_libraries_dir)
+        lib_dirs = [self.e.arduino_core_dir] + list_subdirs(self.e.lib_dir)
+        if not args.skip_lib_includes:
+            lib_dirs += list_subdirs(self.e.arduino_libraries_dir)
+            
         inc_flags = self.recursive_inc_lib_flags(lib_dirs)
-
+        
         # If lib A depends on lib B it have to appear before B in final
         # list so that linker could link all together correctly
         # but order of `_scan_dependencies` is not defined, so...
@@ -284,5 +292,5 @@ class Build(Command):
         self.setup_flags(args)
         self.create_jinja(verbose=args.verbose)
         self.make('Makefile.sketch')
-        self.scan_dependencies()
+        self.scan_dependencies(args)
         self.make('Makefile')
